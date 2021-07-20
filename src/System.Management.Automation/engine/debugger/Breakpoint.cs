@@ -434,10 +434,12 @@ namespace System.Management.Automation
         }
 
         internal int SequencePointIndex { get; set; }
+
         internal IScriptExtent[] SequencePoints { get; set; }
+
         internal BitArray BreakpointBitArray { get; set; }
 
-        private class CheckBreakpointInScript : AstVisitor
+        private sealed class CheckBreakpointInScript : AstVisitor
         {
             public static bool IsInNestedScriptBlock(Ast ast, LineBreakpoint breakpoint)
             {

@@ -265,8 +265,7 @@ namespace Microsoft.PowerShell
 #endif
         }
 
-        private
-        class FindOldestNodeVisitor : NodeVisitor
+        private sealed class FindOldestNodeVisitor : NodeVisitor
         {
             internal override
             bool
@@ -298,6 +297,10 @@ namespace Microsoft.PowerShell
             private int _oldestSoFar;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Performance",
+            "CA1822:Mark members as static",
+            Justification = "Accesses instance members in preprocessor branch.")]
         private
         ProgressNode
         FindOldestLeafmostNodeHelper(ArrayList treeToSearch, out ArrayList listWhereFound, out int indexWhereFound)
@@ -362,8 +365,7 @@ namespace Microsoft.PowerShell
                 FindNodeById(sourceId, activityId, out listWhereFound, out indexWhereFound);
         }
 
-        private
-        class FindByIdNodeVisitor : NodeVisitor
+        private sealed class FindByIdNodeVisitor : NodeVisitor
         {
             internal
             FindByIdNodeVisitor(Int64 sourceIdToFind, int activityIdToFind)
@@ -399,8 +401,8 @@ namespace Microsoft.PowerShell
             int
             IndexWhereFound = -1;
 
-            private int _idToFind = -1;
-            private Int64 _sourceIdToFind;
+            private readonly int _idToFind = -1;
+            private readonly Int64 _sourceIdToFind;
         }
 
         /// <summary>
@@ -504,15 +506,18 @@ namespace Microsoft.PowerShell
             return found;
         }
 
-        private
-        class AgeAndResetStyleVisitor : NodeVisitor
+        private sealed class AgeAndResetStyleVisitor : NodeVisitor
         {
             internal override
             bool
             Visit(ProgressNode node, ArrayList unused, int unusedToo)
             {
                 node.Age = Math.Min(node.Age + 1, Int32.MaxValue - 1);
-                node.Style = ProgressNode.RenderStyle.FullPlus;
+
+                node.Style = ProgressNode.IsMinimalProgressRenderingEnabled()
+                    ? ProgressNode.RenderStyle.Ansi
+                    : node.Style = ProgressNode.RenderStyle.FullPlus;
+
                 return true;
             }
         }
@@ -578,6 +583,13 @@ namespace Microsoft.PowerShell
             }
 
             ArrayList result = new ArrayList();
+
+            if (ProgressNode.IsMinimalProgressRenderingEnabled())
+            {
+                RenderHelper(result, _topLevelNodes, indentation: 0, maxWidth, rawUI);
+                return (string[])result.ToArray(typeof(string));
+            }
+
             string border = StringUtil.Padding(maxWidth);
 
             result.Add(border);
@@ -651,8 +663,7 @@ namespace Microsoft.PowerShell
             }
         }
 
-        private
-        class HeightTallyer : NodeVisitor
+        private sealed class HeightTallyer : NodeVisitor
         {
             internal HeightTallyer(PSHostRawUserInterface rawUi, int maxHeight, int maxWidth)
             {
@@ -676,9 +687,9 @@ namespace Microsoft.PowerShell
                 return true;
             }
 
-            private PSHostRawUserInterface _rawUi;
-            private int _maxHeight;
-            private int _maxWidth;
+            private readonly PSHostRawUserInterface _rawUi;
+            private readonly int _maxHeight;
+            private readonly int _maxWidth;
 
             internal int Tally;
         }
@@ -821,11 +832,9 @@ namespace Microsoft.PowerShell
         {
             nodesCompressed = 0;
 
-            int age = 0;
-
             while (true)
             {
-                ProgressNode node = FindOldestNodeOfGivenStyle(_topLevelNodes, age, priorStyle);
+                ProgressNode node = FindOldestNodeOfGivenStyle(_topLevelNodes, oldestSoFar: 0, priorStyle);
                 if (node == null)
                 {
                     // We've compressed every node of the prior style already.
@@ -1000,10 +1009,9 @@ namespace Microsoft.PowerShell
 
         #endregion
 
-        private ArrayList _topLevelNodes = new ArrayList();
+        private readonly ArrayList _topLevelNodes = new ArrayList();
         private int _nodeCount;
 
         private const int maxNodeCount = 128;
     }
 }   // namespace
-
